@@ -11,14 +11,16 @@ type Logic string
 type OrderMethod string
 
 const (
-	OpEq    Operator = "="
-	OpLe    Operator = "<="
-	OpGe    Operator = ">="
-	OpLt    Operator = "<"
-	OpGt    Operator = "<"
-	OpNotEq Operator = "!="
-	OpLike  Operator = "LIKE"
-	OpIn    Operator = "IN"
+	OpEq      Operator = "="
+	OpLe      Operator = "<="
+	OpGe      Operator = ">="
+	OpLt      Operator = "<"
+	OpGt      Operator = "<"
+	OpNotEq   Operator = "!="
+	OpContain Operator = "Contain"
+	OpPrefix  Operator = "Prefix"
+	OpSuffix  Operator = "Suffix"
+	OpIn      Operator = "IN"
 )
 
 const (
@@ -35,12 +37,12 @@ func Col(col string) Column {
 	return Column(col)
 }
 
-func ConcatCol(cols ...Column) Column {
-	var cs []string
+func ConcatCol(sep string, cols ...Column) Column {
+	cs := make([]string, 0, len(cols))
 	for _, c := range cols {
 		cs = append(cs, string(c))
 	}
-	return Column(fmt.Sprintf("concat_ws(' | ', %s)", strings.Join(cs, ", ")))
+	return Column(fmt.Sprintf("concat_ws('%s', %s)", sep, strings.Join(cs, ", ")))
 }
 
 type Query struct {
@@ -50,31 +52,38 @@ type Query struct {
 	limit    uint64
 }
 
-func (q *Query) OrderExpr() string {
+func NewQuery() *Query {
+	return &Query{}
+}
+
+func (q *Query) AddOrder(col Column, method OrderMethod) *Query {
+	if method != OrderASC {
+		method = OrderDesc
+	}
+	q.orders = append(q.orders, fmt.Sprintf("%s %s", col, method))
+	return q
+}
+
+func (q *Query) Order() (expr string) {
 	return strings.Join(q.orders, ", ")
 }
 
-func (q *Query) WhereExpr() (string, []interface{}) {
-	if len(q.condCols) == 0 {
-		return "", nil
-	}
-	return strings.Join(q.condCols[:len(q.condCols)-1], " "), q.condVals
-}
-
-func (q *Query) LimitExpr() uint64 {
-	return q.limit
-}
-
-func (q *Query) Condition(col Column, op Operator, value interface{}, logic Logic) *Query {
+func (q *Query) AddCondition(col Column, op Operator, value interface{}, logic Logic) *Query {
 	if logic != LogicOr {
 		logic = LogicAnd
 	}
 	var c string
-	var v interface{}
+	v := value
 	switch op {
-	case OpLike:
+	case OpContain:
 		c = fmt.Sprintf("%s LIKE ?", col)
 		v = fmt.Sprintf("%%%s%%", value)
+	case OpPrefix:
+		c = fmt.Sprintf("%s LIKE ?", col)
+		v = fmt.Sprintf("%s%%", value)
+	case OpSuffix:
+		c = fmt.Sprintf("%s LIKE ?", col)
+		v = fmt.Sprintf("%%%s", value)
 	case OpIn:
 		c = fmt.Sprintf("%s IN (?)", col)
 	default:
@@ -85,33 +94,51 @@ func (q *Query) Condition(col Column, op Operator, value interface{}, logic Logi
 	return q
 }
 
-func (q *Query) Order(col Column, method OrderMethod) *Query {
-	if method != OrderASC {
-		method = OrderDesc
+func (q *Query) Where() (expr string, vals []interface{}) {
+	if len(q.condCols) == 0 {
+		return "", nil
 	}
-	q.orders = append(q.orders, fmt.Sprintf("%s %s", col, method))
-	return q
+	return strings.Join(q.condCols[:len(q.condCols)-1], " "), q.condVals
 }
 
-func (q *Query) Limit(limit uint64) *Query {
+func (q *Query) AddLimit(limit uint64) *Query {
 	q.limit = limit
 	return q
 }
 
-type PageQuery struct {
-	Query
-	Page   uint
-	Size   uint
-	Offset uint
+func (q *Query) Limit() uint64 {
+	return q.limit
 }
 
-func (pq *PageQuery) Validate() *PageQuery {
-	if pq.Size == 0 {
-		pq.Size = 10
+type PageQuery struct {
+	Query
+	page   uint64
+	size   uint64
+	offset uint64
+}
+
+func NewPageQuery(page uint64, size uint64) *PageQuery {
+	if page == 0 {
+		page = 1
 	}
-	if pq.Page == 0 {
-		pq.Page = 1
+	if size == 0 {
+		size = 10
 	}
-	pq.Offset = (pq.Page - 1) * pq.Size
-	return pq
+	return &PageQuery{
+		page:   page,
+		size:   size,
+		offset: (page - 1) * size,
+	}
+}
+
+func (pq *PageQuery) Page() uint64 {
+	return pq.page
+}
+
+func (pq *PageQuery) Size() uint64 {
+	return pq.size
+}
+
+func (pq *PageQuery) Offset() uint64 {
+	return pq.offset
 }
