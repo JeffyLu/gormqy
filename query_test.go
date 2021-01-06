@@ -121,6 +121,57 @@ func TestQueryCondition(t *testing.T) {
 	}
 }
 
+func TestQueryGroupConditions(t *testing.T) {
+	type cond struct {
+		col   Column
+		op    Operator
+		value interface{}
+		logic Logic
+	}
+	cases := []struct {
+		conds      []cond
+		groupLogic Logic
+		condsAfter []cond
+		expr       string
+		vals       []interface{}
+	}{
+		{
+			conds: []cond{
+				{"name", OpEq, "Tom", LogicAnd},
+				{"age", OpLe, 20, LogicAnd},
+			},
+			groupLogic: LogicOr,
+			condsAfter: []cond{
+				{"name", OpEq, "Sam", LogicOr},
+				{"age", OpEq, 30, LogicAnd},
+			},
+			expr: "(name = ? AND age <= ?) OR name = ? OR age = ?",
+			vals: []interface{}{"Tom", 20, "Sam", 30},
+		},
+	}
+
+	for _, c := range cases {
+		t.Log(c)
+		q := NewQuery()
+		for _, cond := range c.conds {
+			q.AddCondition(cond.col, cond.op, cond.value, cond.logic)
+		}
+		q.GroupConditions(c.groupLogic)
+		for _, cond := range c.condsAfter {
+			q.AddCondition(cond.col, cond.op, cond.value, cond.logic)
+		}
+		expr, vals := q.Where()
+		if expr != c.expr {
+			t.Fatalf("expect expr: %s, got: %s", c.expr, expr)
+		}
+		for i := 0; i < len(c.vals); i++ {
+			if vals[i] != c.vals[i] {
+				t.Fatalf("expect vals: %v, got: %v", c.vals, vals)
+			}
+		}
+	}
+}
+
 func TestPageQuery(t *testing.T) {
 	cases := []struct {
 		p      uint64

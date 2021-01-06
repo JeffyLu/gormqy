@@ -94,6 +94,14 @@ func (q *Query) AddCondition(col Column, op Operator, value interface{}, logic L
 	return q
 }
 
+func (q *Query) GroupConditions(logic Logic) *Query {
+	q.condCols = []string{
+		fmt.Sprintf("(%s)", strings.Join(q.condCols[:len(q.condCols)-1], " ")),
+		string(logic),
+	}
+	return q
+}
+
 func (q *Query) Where() (expr string, vals []interface{}) {
 	if len(q.condCols) == 0 {
 		return "", nil
