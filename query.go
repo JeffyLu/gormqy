@@ -150,3 +150,26 @@ func (pq *PageQuery) Size() uint64 {
 func (pq *PageQuery) Offset() uint64 {
 	return pq.offset
 }
+
+func (pq *PageQuery) AddOrder(col Column, method OrderMethod) *PageQuery {
+	pq.Query.AddOrder(col, method)
+	return pq
+}
+
+func (pq *PageQuery) AddCondition(col Column, op Operator, value interface{}, logic Logic) *PageQuery {
+	pq.Query.AddCondition(col, op, value, logic)
+	return pq
+}
+
+func (pq *PageQuery) GroupConditions(logic Logic) *PageQuery {
+	pq.Query.condCols = []string{
+		fmt.Sprintf("(%s)", strings.Join(pq.Query.condCols[:len(pq.Query.condCols)-1], " ")),
+		string(logic),
+	}
+	return pq
+}
+
+func (pq *PageQuery) AddLimit(limit uint64) *PageQuery {
+	pq.Query.limit = limit
+	return pq
+}
