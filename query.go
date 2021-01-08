@@ -15,7 +15,7 @@ const (
 	OpLe      Operator = "<="
 	OpGe      Operator = ">="
 	OpLt      Operator = "<"
-	OpGt      Operator = "<"
+	OpGt      Operator = ">"
 	OpNotEq   Operator = "!="
 	OpContain Operator = "Contain"
 	OpPrefix  Operator = "Prefix"
