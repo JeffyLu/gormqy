@@ -4,28 +4,10 @@ import (
 	"testing"
 )
 
-func TestConcatCol(t *testing.T) {
-	cases := []struct {
-		sep  string
-		cols []Column
-		res  Column
-	}{
-		{sep: "|", cols: []Column{"name"}, res: "concat_ws('|', name)"},
-		{sep: "|", cols: []Column{"name", "addr"}, res: "concat_ws('|', name, addr)"},
-	}
-
-	for _, c := range cases {
-		t.Log(c)
-		if res := ConcatCol(c.sep, c.cols...); res != c.res {
-			t.Fatalf("expect: %s, got: %s", c.res, res)
-		}
-	}
-}
-
-func TestQueryOrder(t *testing.T) {
+func TestOrder(t *testing.T) {
 	type order struct {
-		col    Column
-		method OrderMethod
+		column string
+		method string
 	}
 	cases := []struct {
 		orders []order
@@ -50,7 +32,11 @@ func TestQueryOrder(t *testing.T) {
 		t.Log(c)
 		q := NewQuery()
 		for _, o := range c.orders {
-			q.AddOrder(o.col, o.method)
+			if o.method == OrderDesc {
+				q.DESC(o.column)
+			} else {
+				q.ASC(o.column)
+			}
 		}
 		if res := q.Order(); res != c.res {
 			t.Fatalf("expect: %s, got: %s", c.res, res)
@@ -58,116 +44,54 @@ func TestQueryOrder(t *testing.T) {
 	}
 }
 
-func TestQueryCondition(t *testing.T) {
-	type cond struct {
-		col   Column
-		op    Operator
-		value interface{}
-		logic Logic
-	}
-	cases := []struct {
-		conds []cond
-		expr  string
-		vals  []interface{}
-	}{
-		{
-			conds: []cond{
-				{"id", OpEq, 1, LogicAnd},
-			},
-			expr: "id = ?",
-			vals: []interface{}{1},
-		},
-		{
-			conds: []cond{
-				{"name", OpEq, "Tom", LogicAnd},
-				{"age", OpLe, 20, LogicAnd},
-			},
-			expr: "name = ? AND age <= ?",
-			vals: []interface{}{"Tom", 20},
-		},
-		{
-			conds: []cond{
-				{"name", OpPrefix, "T", LogicOr},
-				{"name", OpSuffix, "m", LogicAnd},
-			},
-			expr: "name LIKE ? OR name LIKE ?",
-			vals: []interface{}{"T%", "%m"},
-		},
-		{
-			conds: []cond{
-				{"name", OpContain, "x", LogicAnd},
-				{"age", OpIn, [2]int{10, 20}, LogicAnd},
-			},
-			expr: "name LIKE ? AND age IN (?)",
-			vals: []interface{}{"%x%", [2]int{10, 20}},
-		},
-	}
+func TestCondition(t *testing.T) {
+	{
+		exprExp := "name = ? AND age > ?"
+		t.Log(exprExp)
 
-	for _, c := range cases {
-		t.Log(c)
-		q := NewQuery()
-		for _, cond := range c.conds {
-			q.AddCondition(cond.col, cond.op, cond.value, cond.logic)
+		expr, vals := NewQuery().
+			Condition().
+			Eq("name", "Tom").And().Gt("age", 10).End().
+			Where()
+		if expr != exprExp {
+			t.Fatalf("expect: %s, got: %s", exprExp, expr)
 		}
-		expr, vals := q.Where()
-		if expr != c.expr {
-			t.Fatalf("expect expr: %s, got: %s", c.expr, expr)
-		}
-		for i := 0; i < len(c.vals); i++ {
-			if vals[i] != c.vals[i] {
-				t.Fatalf("expect vals: %v, got: %v", c.vals, vals)
-			}
+		if len(vals) != 2 && vals[0] != "Tom" && vals[1] != 10 {
+			t.Fatalf("expect vals: Tom 10, got: %+v", vals)
 		}
 	}
-}
+	{
+		exprExp := "(name = ? AND age > ?) OR (name = ? AND age <= ?)"
+		t.Log(exprExp)
 
-func TestQueryGroupConditions(t *testing.T) {
-	type cond struct {
-		col   Column
-		op    Operator
-		value interface{}
-		logic Logic
+		expr, vals := NewQuery().
+			Condition().
+			Eq("name", "Tom").And().Gt("age", 10).EndWithGroup().
+			OrCondition().
+			Eq("name", "Sam").And().Le("age", 5).EndWithGroup().
+			Where()
+		if expr != exprExp {
+			t.Fatalf("expect: %s, got: %s", exprExp, expr)
+		}
+		if len(vals) != 4 && vals[0] != "Tom" && vals[1] != 10 && vals[2] != "Sam" && vals[3] != 5 {
+			t.Fatalf("expect vals: Tom 10 Sam 5, got: %+v", vals)
+		}
 	}
-	cases := []struct {
-		conds      []cond
-		groupLogic Logic
-		condsAfter []cond
-		expr       string
-		vals       []interface{}
-	}{
-		{
-			conds: []cond{
-				{"name", OpEq, "Tom", LogicAnd},
-				{"age", OpLe, 20, LogicAnd},
-			},
-			groupLogic: LogicOr,
-			condsAfter: []cond{
-				{"name", OpEq, "Sam", LogicOr},
-				{"age", OpEq, 30, LogicAnd},
-			},
-			expr: "(name = ? AND age <= ?) OR name = ? OR age = ?",
-			vals: []interface{}{"Tom", 20, "Sam", 30},
-		},
-	}
+	{
+		exprExp := "(name LIKE ? OR name LIKE ?) AND age >= ? AND point < ?"
+		t.Log(exprExp)
 
-	for _, c := range cases {
-		t.Log(c)
-		q := NewQuery()
-		for _, cond := range c.conds {
-			q.AddCondition(cond.col, cond.op, cond.value, cond.logic)
+		expr, vals := NewQuery().
+			Condition().
+			Prefix("name", "T").Or().Suffix("name", "d").EndWithGroup().
+			AndCondition().
+			Ge("age", 10).And().Lt("point", 70).End().
+			Where()
+		if expr != exprExp {
+			t.Fatalf("expect: %s, got: %s", exprExp, expr)
 		}
-		q.GroupConditions(c.groupLogic)
-		for _, cond := range c.condsAfter {
-			q.AddCondition(cond.col, cond.op, cond.value, cond.logic)
-		}
-		expr, vals := q.Where()
-		if expr != c.expr {
-			t.Fatalf("expect expr: %s, got: %s", c.expr, expr)
-		}
-		for i := 0; i < len(c.vals); i++ {
-			if vals[i] != c.vals[i] {
-				t.Fatalf("expect vals: %v, got: %v", c.vals, vals)
-			}
+		if len(vals) != 4 && vals[0] != "T%" && vals[1] != "%%d" && vals[2] != 10 && vals[3] != 70 {
+			t.Fatalf("expect vals: T%% %%d 10 70, got: %+v", vals)
 		}
 	}
 }
