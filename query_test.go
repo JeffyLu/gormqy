@@ -117,7 +117,6 @@ func TestCondition(t *testing.T) {
 		}
 	}
 	{
-
 		exprExp := "((a = ? AND b = ?) OR (c = ? AND d = ?)) AND e = ?"
 		t.Log(exprExp)
 
@@ -136,6 +135,31 @@ func TestCondition(t *testing.T) {
 		}
 		if len(vals) != 5 || vals[0] != 1 || vals[1] != 1 || vals[2] != 1 || vals[3] != 1 || vals[4] != 1 {
 			t.Fatalf("expect vals: [1 1 1 1 1], got: %+v", vals)
+		}
+	}
+	{
+		exprExp := "a = ? AND ((a = ? AND b = ?) OR (c = ? AND d = ?)) AND ((e = ? AND f = ?) OR (g = ? AND h = ?)) AND h = ?"
+		t.Log(exprExp)
+
+		expr, vals := New().Condition().
+			Eq("a", 1).And().
+			WithLeftBracket().WithLeftBracket().Eq("a", 1).And().
+			Eq("b", 1).WithRightBracket().Or().
+			WithLeftBracket().Eq("c", 1).And().
+			Eq("d", 1).WithRightBracket().WithRightBracket().And().
+			WithLeftBracket().WithLeftBracket().Eq("e", 1).And().
+			Eq("f", 1).WithRightBracket().Or().
+			WithLeftBracket().Eq("g", 1).And().
+			Eq("h", 1).WithRightBracket().WithRightBracket().And().
+			Eq("h", 1).End().
+			Where()
+		if expr != exprExp {
+			t.Fatalf("expect: %s, got: %s", exprExp, expr)
+		}
+		if len(vals) != 10 ||
+			vals[0] != 1 || vals[1] != 1 || vals[2] != 1 || vals[3] != 1 || vals[4] != 1 ||
+			vals[5] != 1 || vals[6] != 1 || vals[7] != 1 || vals[8] != 1 || vals[9] != 1 {
+			t.Fatalf("expect vals: [1 1 1 1 1 1 1 1 1 1], got: %+v", vals)
 		}
 	}
 }

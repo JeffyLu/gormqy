@@ -32,6 +32,11 @@ func (l *Logic) EndWithGroup() *Query {
 	return l.end(true)
 }
 
+func (l *Logic) WithRightBracket() *Logic {
+	l.cond.withRightBracket()
+	return l
+}
+
 func (l *Logic) end(group bool) *Query {
 	if len(l.cond.exprs) == 0 {
 		return l.cond.query
