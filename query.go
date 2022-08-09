@@ -1,6 +1,7 @@
 package gormqy
 
 import (
+	"fmt"
 	"strings"
 )
 
@@ -20,15 +21,30 @@ func (q *Query) Condition() *Condition {
 }
 
 func (q *Query) AndCondition() *Condition {
-	return q.conditionAfter(LogicAnd)
+	return q.conditionAfter(LogicAnd, false)
+}
+
+func (q *Query) AndConditionAfterGroup() *Condition {
+	return q.conditionAfter(LogicAnd, true)
 }
 
 func (q *Query) OrCondition() *Condition {
-	return q.conditionAfter(LogicOr)
+	return q.conditionAfter(LogicOr, false)
 }
 
-func (q *Query) conditionAfter(logic string) *Condition {
+func (q *Query) OrConditionAfterGroup() *Condition {
+	return q.conditionAfter(LogicOr, true)
+}
+
+func (q *Query) group() {
+	q.exprs = []string{fmt.Sprintf("(%s)", strings.Join(q.exprs, " "))}
+}
+
+func (q *Query) conditionAfter(logic string, groupFirst bool) *Condition {
 	if len(q.exprs) != 0 {
+		if groupFirst {
+			q.group()
+		}
 		q.exprs = append(q.exprs, logic)
 	}
 	return q.Condition()

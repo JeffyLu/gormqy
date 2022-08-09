@@ -59,6 +59,10 @@ func (c *Condition) In(column string, val interface{}) *Logic {
 	return c.add(fmt.Sprintf("%s IN (?)", column), val)
 }
 
+func (c *Condition) NotIn(column string, val interface{}) *Logic {
+	return c.add(fmt.Sprintf("%s NOT IN (?)", column), val)
+}
+
 func (c *Condition) add(expr string, val interface{}) *Logic {
 	c.exprs = append(c.exprs, expr)
 	c.vals = append(c.vals, val)
