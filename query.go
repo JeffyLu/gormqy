@@ -6,10 +6,11 @@ import (
 )
 
 type Query struct {
-	exprs  []string
-	vals   []interface{}
-	orders []string
-	limit  uint64
+	whereExprs []string
+	whereVals  []interface{}
+	selectCols []string
+	orders     []string
+	limit      uint64
 }
 
 func New() *Query {
@@ -37,24 +38,35 @@ func (q *Query) OrConditionAfterGroup() *Condition {
 }
 
 func (q *Query) group() {
-	q.exprs = []string{fmt.Sprintf("(%s)", strings.Join(q.exprs, " "))}
+	q.whereExprs = []string{fmt.Sprintf("(%s)", strings.Join(q.whereExprs, " "))}
 }
 
 func (q *Query) conditionAfter(logic string, groupFirst bool) *Condition {
-	if len(q.exprs) != 0 {
+	if len(q.whereExprs) != 0 {
 		if groupFirst {
 			q.group()
 		}
-		q.exprs = append(q.exprs, logic)
+		q.whereExprs = append(q.whereExprs, logic)
 	}
 	return q.Condition()
 }
 
 func (q *Query) Where() (expr string, vals []interface{}) {
-	if len(q.exprs) == 0 {
+	if len(q.whereExprs) == 0 {
 		return "", nil
 	}
-	return strings.Join(q.exprs, " "), q.vals
+	return strings.Join(q.whereExprs, " "), q.whereVals
+}
+
+func (q *Query) SelectCols(cols ...string) {
+	q.selectCols = append(q.selectCols, cols...)
+}
+
+func (q *Query) Select() string {
+	if len(q.selectCols) == 0 {
+		return "*"
+	}
+	return strings.Join(q.selectCols, ", ")
 }
 
 func (q *Query) ToPageQuery(page uint64, size uint64) *PageQuery {

@@ -47,7 +47,7 @@ func (l *Logic) end(group bool) *Query {
 		expr = "(" + expr + ")"
 	}
 
-	l.cond.query.exprs = append(l.cond.query.exprs, expr)
-	l.cond.query.vals = append(l.cond.query.vals, l.cond.vals...)
+	l.cond.query.whereExprs = append(l.cond.query.whereExprs, expr)
+	l.cond.query.whereVals = append(l.cond.query.whereVals, l.cond.vals...)
 	return l.cond.query
 }
